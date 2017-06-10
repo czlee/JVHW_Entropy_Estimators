@@ -22,6 +22,17 @@ def est_entro_JVHW(samp):
     samp = formalize_sample(samp)
     [n, wid] = samp.shape
     n = float(n)
+    f = fingerprint(samp)
+    return _est_entro_JVHW(f, n, wid)
+
+def est_entro_JVHW_from_fingerprint(fingerprint):
+    """`fingerprint` should be a list."""
+    n = np.dot(fingerprint, range(1, len(fingerprint)+1))
+    f = np.array(fingerprint).reshape(len(fingerprint), 1)
+    wid = 1 # not sure what to do with the case where this is > 1
+    return _est_entro_JVHW(f, n, wid)
+
+def _est_entro_JVHW(f, n, wid):
 
     # The order of polynomial is no more than 22 because otherwise floating-point error occurs
     order = min(4 + int(np.ceil(1.2 * np.log(n))), 22)
@@ -29,8 +40,6 @@ def est_entro_JVHW(samp):
     if poly_entro is None:
         poly_entro = sio.loadmat('poly_coeff_entro.mat')['poly_entro']
     coeff = poly_entro[order-1, 0][0]
-
-    f = fingerprint(samp)
 
     prob = np.arange(1, f.shape[0] + 1) / n
 
