@@ -27,6 +27,7 @@ def est_entro_JVHW(samp):
 
 def est_entro_JVHW_from_fingerprint(fingerprint):
     """`fingerprint` should be a list."""
+    fingerprint = [float(x) for x in fingerprint]
     n = np.dot(fingerprint, range(1, len(fingerprint)+1))
     f = np.array(fingerprint).reshape(len(fingerprint), 1)
     wid = 1 # not sure what to do with the case where this is > 1
