@@ -83,7 +83,7 @@ def est_entro_JVHW_from_fingerprint_dict(fingerprint):
     fnonzero_rows = sorted(list(set(f_csc.nonzero()[0])))
 
     prob_dok = ssp.dok_matrix((f_csc.shape[0], 1))
-    prob_dok[fnonzero_rows,0] = (np.array(fnonzero_rows)+1)/n
+    prob_dok[fnonzero_rows,0] = (np.array(fnonzero_rows, dtype=float, ndmin=2).T+1)/n
     prob_csc = prob_dok.tocsc()
 
     # Piecewise linear/quadratic fit of c_1
@@ -106,7 +106,7 @@ def est_entro_JVHW_from_fingerprint_dict(fingerprint):
             # make sure nonzero threshold is higher than 1/n
             c_1[f1nonzero] = np.maximum(c_1[f1nonzero], 1 / (1.9 * np.log(n)))
 
-        prob_mat = ssp.lil_matrix(f_csc.shape)
+        prob_mat = ssp.dok_matrix(f_csc.shape)
         prob_mat[fnonzero_rows] = entro_mat(prob_csc.data, n, coeff, c_1)
 
     return np.array(f_csc.multiply(prob_mat).sum(axis=0)).squeeze() / np.log(2)
