@@ -66,9 +66,11 @@ def est_entro_JVHW_from_fingerprint_dict(fingerprint):
     fingerprint = {(k if isinstance(k, tuple) else (k,0)): v for k, v in fingerprint.items()}
     shape = tuple(np.max(np.array(list(fingerprint.keys())), axis=0) + 1)
     f_dok = ssp.dok_matrix(shape, dtype=int)
+    n = 0
     for k, v in fingerprint.items():
         f_dok[k] = v
-    n = ssp.csr_matrix(np.arange(1, f_dok.shape[0]+1)).dot(f_dok).max()
+        if k[1] == 0: # assume all columns imply the same n as the first
+            n += k[0] * v
     wid = f_dok.shape[1]
 
     order = min(4 + int(np.ceil(1.2 * np.log(n))), 22)
