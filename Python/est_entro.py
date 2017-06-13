@@ -79,17 +79,17 @@ def est_entro_JVHW_from_fingerprint_dict(fingerprint):
         poly_entro = sio.loadmat('poly_coeff_entro.mat')['poly_entro']
     coeff = poly_entro[order-1, 0][0]
 
-    f_csr = f_dok.tocsr()
-    fnonzero_rows = sorted(list(set(f_csr.nonzero()[0])))
+    f_csc = f_dok.tocsc()
+    fnonzero_rows = sorted(list(set(f_csc.nonzero()[0])))
 
-    prob_dok = ssp.dok_matrix((f_csr.shape[0], 1))
+    prob_dok = ssp.dok_matrix((f_csc.shape[0], 1))
     prob_dok[fnonzero_rows,0] = (np.array(fnonzero_rows)+1)/n
-    prob_csr = prob_dok.tocsr()
+    prob_csc = prob_dok.tocsc()
 
     # Piecewise linear/quadratic fit of c_1
     V1 = np.array([0.3303, 0.4679])
     V2 = np.array([-0.530556484842359, 1.09787328176926, 0.184831781602259])
-    f_row1 = f_csr[0].toarray().squeeze(0)
+    f_row1 = f_csc[0].toarray().squeeze(0)
     f1nonzero = f_row1 > 0
     c_1 = np.zeros(wid)
 
@@ -106,10 +106,10 @@ def est_entro_JVHW_from_fingerprint_dict(fingerprint):
             # make sure nonzero threshold is higher than 1/n
             c_1[f1nonzero] = np.maximum(c_1[f1nonzero], 1 / (1.9 * np.log(n)))
 
-        prob_mat = ssp.lil_matrix(f_csr.shape)
-        prob_mat[fnonzero_rows] = entro_mat(prob_csr.data, n, coeff, c_1)
+        prob_mat = ssp.lil_matrix(f_csc.shape)
+        prob_mat[fnonzero_rows] = entro_mat(prob_csc.data, n, coeff, c_1)
 
-    return np.array(f_csr.multiply(prob_mat).sum(axis=0)).squeeze() / np.log(2)
+    return np.array(f_csc.multiply(prob_mat).sum(axis=0)).squeeze() / np.log(2)
 
 
 def entro_mat(x, n, g_coeff, c_1):
