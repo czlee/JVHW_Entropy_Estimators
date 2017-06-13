@@ -1,5 +1,6 @@
 import numpy as np
 import scipy.io as sio
+import scipy.sparse as ssp
 
 poly_entro = None
 
@@ -22,18 +23,6 @@ def est_entro_JVHW(samp):
     samp = formalize_sample(samp)
     [n, wid] = samp.shape
     n = float(n)
-    f = fingerprint(samp)
-    return _est_entro_JVHW(f, n, wid)
-
-def est_entro_JVHW_from_fingerprint(fingerprint):
-    """`fingerprint` should be a list."""
-    fingerprint = [float(x) for x in fingerprint]
-    n = np.dot(fingerprint, range(1, len(fingerprint)+1))
-    f = np.array(fingerprint).reshape(len(fingerprint), 1)
-    wid = 1 # not sure what to do with the case where this is > 1
-    return _est_entro_JVHW(f, n, wid)
-
-def _est_entro_JVHW(f, n, wid):
 
     # The order of polynomial is no more than 22 because otherwise floating-point error occurs
     order = min(4 + int(np.ceil(1.2 * np.log(n))), 22)
@@ -41,6 +30,8 @@ def _est_entro_JVHW(f, n, wid):
     if poly_entro is None:
         poly_entro = sio.loadmat('poly_coeff_entro.mat')['poly_entro']
     coeff = poly_entro[order-1, 0][0]
+
+    f = fingerprint(samp)
 
     prob = np.arange(1, f.shape[0] + 1) / n
 
@@ -66,6 +57,58 @@ def _est_entro_JVHW(f, n, wid):
         prob_mat = entro_mat(prob, n, coeff, c_1)
 
     return np.sum(f * prob_mat, axis=0) / np.log(2)
+
+
+def est_entro_JVHW_from_fingerprint_dict(fingerprint):
+    """`fingerprint` should be a dict mapping frequencies to how often that
+    frequency occurs in the profile."""
+
+    fingerprint = {(k if isinstance(k, tuple) else (k,0)): v for k, v in fingerprint.items()}
+    shape = tuple(np.max(np.array(list(fingerprint.keys())), axis=0) + 1)
+    f_dok = ssp.dok_matrix(shape, dtype=int)
+    for k, v in fingerprint.items():
+        f_dok[k] = v
+    n = ssp.csr_matrix(np.arange(1, f_dok.shape[0]+1)).dot(f_dok).max()
+    wid = f_dok.shape[1]
+
+    order = min(4 + int(np.ceil(1.2 * np.log(n))), 22)
+    global poly_entro
+    if poly_entro is None:
+        poly_entro = sio.loadmat('poly_coeff_entro.mat')['poly_entro']
+    coeff = poly_entro[order-1, 0][0]
+
+    f_csr = f_dok.tocsr()
+    fnonzero_rows = sorted(list(set(f_csr.nonzero()[0])))
+
+    prob_dok = ssp.dok_matrix((f_csr.shape[0], 1))
+    prob_dok[fnonzero_rows,0] = (np.array(fnonzero_rows)+1)/n
+    prob_csr = prob_dok.tocsr()
+
+    # Piecewise linear/quadratic fit of c_1
+    V1 = np.array([0.3303, 0.4679])
+    V2 = np.array([-0.530556484842359, 1.09787328176926, 0.184831781602259])
+    f_row1 = f_csr[0].toarray().squeeze(0)
+    f1nonzero = f_row1 > 0
+    c_1 = np.zeros(wid)
+
+    with np.errstate(divide='ignore', invalid='ignore'):
+        if n >= order and f1nonzero.any():
+            if n < 200:
+                c_1[f1nonzero] = np.polyval(V1, np.log(n / f[0, f1nonzero]))
+            else:
+                n2f1_small = f1nonzero & (np.log(n / f_row1) <= 1.5)
+                n2f1_large = f1nonzero & (np.log(n / f_row1) > 1.5)
+                c_1[n2f1_small] = np.polyval(V2, np.log(n / f_row1[n2f1_small]))
+                c_1[n2f1_large] = np.polyval(V1, np.log(n / f_row1[n2f1_large]))
+
+            # make sure nonzero threshold is higher than 1/n
+            c_1[f1nonzero] = np.maximum(c_1[f1nonzero], 1 / (1.9 * np.log(n)))
+
+        prob_mat = ssp.lil_matrix(f_csr.shape)
+        prob_mat[fnonzero_rows] = entro_mat(prob_csr.data, n, coeff, c_1)
+
+    return np.array(f_csr.multiply(prob_mat).sum(axis=0)).squeeze() / np.log(2)
+
 
 def entro_mat(x, n, g_coeff, c_1):
     # g_coeff = {g0, g1, g2, ..., g_K}, K: the order of best polynomial approximation,
