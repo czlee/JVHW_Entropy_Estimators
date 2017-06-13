@@ -70,7 +70,7 @@ def est_entro_JVHW_from_fingerprint_dict(fingerprint):
     for k, v in fingerprint.items():
         f_dok[k] = v
         if k[1] == 0: # assume all columns imply the same n as the first
-            n += k[0] * v
+            n += (k[0] + 1) * v
     wid = f_dok.shape[1]
 
     order = min(4 + int(np.ceil(1.2 * np.log(n))), 22)
